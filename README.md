@@ -26,3 +26,6 @@ A real-world simulation of a GitHub Pull Request review workflow. AI agents must
 
 ## Setup
 Built with OpenEnv. Run via `openenv build` or `docker build`.
+
+## Author
+Created by Satyam Singh Rawat & Bhumika Bahuguna for the OpenEnv Hackathon.
