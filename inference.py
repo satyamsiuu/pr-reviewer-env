@@ -5,16 +5,23 @@ import re
 import textwrap
 from typing import List, Optional
 from openai import OpenAI
-
 from models import PRReviewAction
 from client import PrReviewerEnvClient
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
 
 # --- HACKATHON REQUIRED CONFIGURATION ---
-IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME", "pr_reviewer_env:latest") 
-# Groq specific settings
-API_KEY = os.getenv("API_KEY") or os.getenv("HF_TOKEN") or "dummy_key"
-API_BASE_URL = "https://api.groq.com/openai/v1"
-MODEL_NAME = "llama-3.3-70b-versatile" # This is Groq's current top-tier fast model
+LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME", "pr_reviewer_env:latest") 
+
+# CRITICAL FIX: os.getenv allows the judges to inject their own endpoint/model. 
+# Your Groq settings are now just local fallbacks!
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api.groq.com/openai/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "llama-3.3-70b-versatile")
+
+# Use HF_TOKEN if the judges provide it, otherwise use your local API_KEY
+HF_TOKEN = os.getenv("HF_TOKEN")
+API_KEY = HF_TOKEN or os.getenv("API_KEY") or "dummy_key"
 
 TASK_NAME = "pr_review"
 BENCHMARK = "pr_reviewer_env"
@@ -41,19 +48,21 @@ SYSTEM_PROMPT = textwrap.dedent(
     """
 ).strip()
 
+# --- STRICT STDOUT FORMATTING ---
 def log_start(task: str, env: str, model: str) -> None:
     print(f"[START] task={task} env={env} model={model}", flush=True)
 
 def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
     error_val = error if error else "null"
-    done_val = str(done).lower()
+    done_val = "true" if done else "false" # Must be exactly lowercase string
     # Flatten the action string to remove newlines for the logger
     action_flat = action.replace("\n", "").replace("\r", "")
     print(f"[STEP] step={step} action={action_flat} reward={reward:.2f} done={done_val} error={error_val}", flush=True)
 
 def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
+    success_val = "true" if success else "false" # Must be exactly lowercase string
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}", flush=True)
+    print(f"[END] success={success_val} steps={steps} score={score:.3f} rewards={rewards_str}", flush=True)
 
 def build_user_prompt(step: int, diff: List[str], feedback: str) -> str:
     diff_text = "\n".join([f"Line {i+1}: {line}" for i, line in enumerate(diff)])
@@ -78,22 +87,18 @@ def extract_action_from_llm(text: str) -> PRReviewAction:
                 action_type=data.get("action_type", "inspect_line"),
                 line_number=data.get("line_number"),
                 issue_type=data.get("issue_type"),
-                search_query=data.get("search_query") # <-- ADD THIS LINE
+                search_query=data.get("search_query")
             )
-    except Exception as e:
-        print(f"[DEBUG] JSON Parse Error: {e}")
-    return PRReviewAction(action_type="scroll_down") # Fallback keeps the AI moving
+    except Exception:
+        pass
+    return PRReviewAction(action_type="scroll_down") 
 
 async def main() -> None:
-    # Note: If testing without a real LLM endpoint, the client will fail here.
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
-    # Initialize environment (Can also use base_url="http://localhost:8000" if running locally without Docker yet)
-    # Since the hackathon validator expects it to run, we use the local running server logic fallback for testing.
     try:
-        env = await PrReviewerEnvClient.from_docker_image(IMAGE_NAME)
+        env = await PrReviewerEnvClient.from_docker_image(LOCAL_IMAGE_NAME)
     except Exception as e:
-        print(f"[DEBUG] Docker image not found or failed, falling back to local UV server. Error: {e}")
         env = PrReviewerEnvClient(base_url="http://localhost:8000")
 
     history: List[str] = []
@@ -124,8 +129,7 @@ async def main() -> None:
                     temperature=TEMPERATURE,
                 )
                 llm_text = completion.choices[0].message.content or ""
-            except Exception as e:
-                print(f"[DEBUG] Model Request Failed (Check API Keys): {e}")
+            except Exception:
                 llm_text = '{"action_type": "inspect_line", "line_number": 1}'
 
             action = extract_action_from_llm(llm_text)
@@ -137,19 +141,19 @@ async def main() -> None:
             rewards.append(reward)
             steps_taken = step
             
-            log_step(step=step, action=str(action), reward=reward, done=result.done, error=obs.error)
+            # Action is converted to flat JSON string for compliant logging
+            log_step(step=step, action=action.model_dump_json(), reward=reward, done=result.done, error=obs.error)
 
             if result.done:
                 break
 
-        # Calculate score (0.0 to 1.0). Our tasks give max 1.0 reward on success.
         score = max(0.0, min(1.0, sum(rewards)))
         success = score > 0.5
 
     finally:
         try:
             await env.close()
-        except Exception as e:
+        except Exception:
             pass
         log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
 
