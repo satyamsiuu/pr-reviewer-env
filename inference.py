@@ -11,26 +11,33 @@ from client import PrReviewerEnvClient
 
 # --- HACKATHON REQUIRED CONFIGURATION ---
 IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME", "pr_reviewer_env:latest") 
-API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY", "dummy_key")
-API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1") # Change to your LLM provider
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
+# Groq specific settings
+API_KEY = os.getenv("API_KEY") or os.getenv("HF_TOKEN") or "dummy_key"
+API_BASE_URL = "https://api.groq.com/openai/v1"
+MODEL_NAME = "llama-3.3-70b-versatile" # This is Groq's current top-tier fast model
 
 TASK_NAME = "pr_review"
 BENCHMARK = "pr_reviewer_env"
-MAX_STEPS = 5
+MAX_STEPS = 20
 TEMPERATURE = 0.2
 
 SYSTEM_PROMPT = textwrap.dedent(
     """
-    You are an expert autonomous code reviewer. Your job is to find vulnerabilities in a code diff.
-    You can inspect lines, request changes, or approve the PR.
+    You are an expert autonomous code reviewer navigating a large codebase.
+    You only see 15 lines of code at a time.
     
     You MUST respond with a valid JSON object matching this exact schema:
     {
-        "action_type": "inspect_line" | "request_changes" | "approve_pr",
+        "action_type": "scroll_down" | "scroll_up" | "search" | "inspect_line" | "request_changes",
         "line_number": <int or null>,
-        "issue_type": "<string or null>"
+        "issue_type": "hardcoded_secret" | "inefficient_loop" | "sql_injection" | null,
+        "search_query": "<string or null>"
     }
+    
+    Tools:
+    - "search": Provide a "search_query" (e.g., "SELECT") to find suspicious keywords.
+    - "scroll_down" / "scroll_up": Move your viewport through the file.
+    - "request_changes": Use this ONLY when you are looking at the exact line of the vulnerability.
     """
 ).strip()
 
@@ -63,21 +70,19 @@ def build_user_prompt(step: int, diff: List[str], feedback: str) -> str:
     ).strip()
 
 def extract_action_from_llm(text: str) -> PRReviewAction:
-    """Safely extracts the JSON action from the LLM's text output."""
     try:
-        # Find JSON block even if LLM adds markdown formatting
         match = re.search(r'\{.*\}', text, re.DOTALL)
         if match:
             data = json.loads(match.group(0))
             return PRReviewAction(
                 action_type=data.get("action_type", "inspect_line"),
                 line_number=data.get("line_number"),
-                issue_type=data.get("issue_type")
+                issue_type=data.get("issue_type"),
+                search_query=data.get("search_query") # <-- ADD THIS LINE
             )
     except Exception as e:
         print(f"[DEBUG] JSON Parse Error: {e}")
-    # Fallback if LLM fails
-    return PRReviewAction(action_type="inspect_line", line_number=1)
+    return PRReviewAction(action_type="scroll_down") # Fallback keeps the AI moving
 
 async def main() -> None:
     # Note: If testing without a real LLM endpoint, the client will fail here.
@@ -95,6 +100,7 @@ async def main() -> None:
     rewards: List[float] = []
     steps_taken = 0
     score = 0.0
+    success = False
 
     log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
 

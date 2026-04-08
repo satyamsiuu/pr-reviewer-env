@@ -1,29 +1,27 @@
-from dataclasses import dataclass
 from typing import List, Optional
-from openenv.core.env_server import Action, Observation, State
+from pydantic import BaseModel, ConfigDict
 
-@dataclass
-class PRReviewAction(Action):
-    """The AI agent's response."""
-    action_type: str            # Must be 'inspect_line', 'request_changes', or 'approve_pr'
+class PRReviewAction(BaseModel):
+    model_config = ConfigDict(extra='ignore')
+    action_type: str  # Now accepts: "scroll_down", "scroll_up", "search", "inspect_line", "request_changes"
     line_number: Optional[int] = None
     issue_type: Optional[str] = None
+    search_query: Optional[str] = None # Added for the search action
 
-@dataclass
-class PRReviewObservation(Observation):
-    """What the AI agent sees at each step."""
+class PRReviewObservation(BaseModel):
+    model_config = ConfigDict(extra='ignore')
     code_diff: List[str]
     step_count: int
     max_steps: int
-    feedback: str               # The environment's response to the last action
+    feedback: str
     done: bool
     reward: float
+    error: Optional[str] = None  # The logger looks for this
 
-@dataclass
-class PRReviewState(State):
-    """Internal state for debugging and validation."""
+class PRReviewState(BaseModel):
+    model_config = ConfigDict(extra='ignore')
     episode_id: str
     step_count: int
     current_task_level: str
-    target_line: int            # The hidden correct line
-    target_issue: str           # The hidden correct issue
+    target_line: int
+    target_issue: str

@@ -1,9 +1,8 @@
 from typing import Any, Dict
-from openenv.core.http_env_client import HTTPEnvClient
-from openenv.core.types import StepResult
+from openenv.core.env_client import EnvClient, StepResult
 from models import PRReviewAction, PRReviewObservation, PRReviewState
 
-class PrReviewerEnvClient(HTTPEnvClient[PRReviewAction, PRReviewObservation]):
+class PrReviewerEnvClient(EnvClient[PRReviewAction, PRReviewObservation, PRReviewState]):
     def _step_payload(self, action: PRReviewAction) -> dict:
         """Convert Action into JSON"""
         return {
