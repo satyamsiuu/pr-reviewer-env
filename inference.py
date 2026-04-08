@@ -94,7 +94,7 @@ async def main() -> None:
     try:
         env = await PrReviewerEnvClient.from_docker_image(LOCAL_IMAGE_NAME)
     except Exception as e:
-        env = PrReviewerEnvClient(base_url="http://localhost:8000")
+        env = PrReviewerEnvClient(base_url="http://localhost:7860")
 
     history: List[str] = []
     rewards: List[float] = []
