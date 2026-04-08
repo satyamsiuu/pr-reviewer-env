@@ -12,15 +12,10 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 # --- HACKATHON REQUIRED CONFIGURATION ---
-LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME", "pr_reviewer_env:latest") 
-
-# CRITICAL FIX: os.getenv allows the judges to inject their own endpoint/model. 
-# Your Groq settings are now just local fallbacks!
-API_BASE_URL = os.getenv("API_BASE_URL", "https://api.groq.com/openai/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "llama-3.3-70b-versatile")
-
-# Use HF_TOKEN if the judges provide it, otherwise use your local API_KEY
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
 HF_TOKEN = os.getenv("HF_TOKEN")
+LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME") 
 API_KEY = HF_TOKEN or os.getenv("API_KEY") or "dummy_key"
 
 TASK_NAME = "pr_review"
