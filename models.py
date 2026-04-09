@@ -10,6 +10,7 @@ class PRReviewAction(BaseModel):
 
 class PRReviewObservation(BaseModel):
     model_config = ConfigDict(extra='ignore')
+    task_name: Optional[str] = None  # Which named task is active
     code_diff: List[str]
     step_count: int
     max_steps: int

@@ -18,7 +18,7 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME") 
 API_KEY = HF_TOKEN or os.getenv("API_KEY") or "dummy_key"
 
-TASK_NAME = "pr_review"
+TASK_NAME = "pr_review_easy"  # One of: pr_review_easy, pr_review_medium, pr_review_hard
 BENCHMARK = "pr_reviewer_env"
 MAX_STEPS = 20
 TEMPERATURE = 0.2
@@ -142,7 +142,8 @@ async def main() -> None:
             if result.done:
                 break
 
-        score = max(0.0, min(1.0, sum(rewards)))
+        # Clamp strictly to (0.01, 0.99) — Phase 2 rejects exact 0.0 or 1.0
+        score = max(0.01, min(0.99, sum(rewards)))
         success = score > 0.5
 
     finally:
