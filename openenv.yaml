@@ -1,3 +1,22 @@
 name: pr_reviewer_env
 version: "1.0.0"
 description: An interactive environment where an AI agent reviews code diffs, inspects lines, and detects vulnerabilities.
+
+tasks:
+  - id: pr_review_easy
+    name: "PR Review — Easy (Hardcoded Secret)"
+    description: "Detect a hardcoded API key in a database connector function."
+    difficulty: easy
+    grader: "graders:grade_easy"
+
+  - id: pr_review_medium
+    name: "PR Review — Medium (Inefficient Loop)"
+    description: "Identify an O(n^2) nested loop that should be vectorised."
+    difficulty: medium
+    grader: "graders:grade_medium"
+
+  - id: pr_review_hard
+    name: "PR Review — Hard (SQL Injection)"
+    description: "Detect unsanitised string concatenation enabling SQL injection."
+    difficulty: hard
+    grader: "graders:grade_hard"
