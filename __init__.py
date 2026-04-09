@@ -6,11 +6,11 @@
 
 """Pr Reviewer Env Environment."""
 
-from .client import PrReviewerEnv
-from .models import PrReviewerAction, PrReviewerObservation
+from .client import PrReviewerEnvClient
+from .models import PRReviewAction, PRReviewObservation
 
 __all__ = [
-    "PrReviewerAction",
-    "PrReviewerObservation",
-    "PrReviewerEnv",
+    "PRReviewAction",
+    "PRReviewObservation",
+    "PrReviewerEnvClient",
 ]
